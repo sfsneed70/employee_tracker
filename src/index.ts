@@ -74,7 +74,7 @@ console.table(department.rows);
 const role = await client.query(`SELECT role.id, role.title,
    dept.name AS department,
    role.salary FROM role
-   JOIN department dept ON role.department = dept.id`);
+   INNER JOIN department dept ON role.department = dept.id`);
 console.table(role.rows);
 const employee =
   await client.query(`SELECT emp.id, emp.first_name, emp.last_name,
