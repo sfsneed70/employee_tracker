@@ -1,4 +1,5 @@
 // importing classes from other files
+import pg from "pg";
 import inquirer from "inquirer";
 import Truck from "./Truck.js";
 import Car from "./Car.js";
@@ -67,41 +68,42 @@ class Cli {
       .then((answers) => {
         if (answers.vehicleType === "Car") {
           // create a car
-          this.createCar();
+          this.addEmployee();
         }
         // TODO: add statements to create a truck or motorbike if the user selects the respective vehicle type
         else if (answers.vehicleType === "Truck") {
-          this.createTruck();
+          this.addDepartment();
         } else if (answers.vehicleType === "Motorbike") {
-          this.createMotorbike();
+          this.addRole();
         }
       });
   }
 
   // method to create a car
-  createCar(): void {
+  addEmployee(): void {
     inquirer
       .prompt([
         {
           type: "input",
-          name: "color",
-          message: "Enter Color",
+          name: "first_name",
+          message: "What is the employee's first name?",
         },
         {
           type: "input",
-          name: "make",
-          message: "Enter Make",
+          name: "last_name",
+          message: "What is the employee's last name?",
         },
         {
           type: "input",
-          name: "model",
-          message: "Enter Model",
+          name: "role",
+          message: "What is the employee's role?",
         },
         {
           type: "input",
-          name: "year",
-          message: "Enter Year",
+          name: "manager",
+          message: "Who is the employee's manager?",
         },
+        // That's it.
         {
           type: "input",
           name: "weight",
@@ -134,15 +136,73 @@ class Cli {
       });
   }
 
+    // method to create a car
+    updateEmployeeRole(): void {
+      inquirer
+        .prompt([
+          {
+            type: "input",
+            name: "name",
+            message: "Which employee's role do you want to update?",
+          },
+          {
+            type: "input",
+            name: "role",
+            message: "Which role do you want to assign to the selected employee?",
+          },
+          // That's it.
+          {
+            type: "input",
+            name: "role",
+            message: "What is the employee's role?",
+          },
+          {
+            type: "input",
+            name: "manager",
+            message: "Who is the employee's manager?",
+          },
+          {
+            type: "input",
+            name: "weight",
+            message: "Enter Weight",
+          },
+          {
+            type: "input",
+            name: "topSpeed",
+            message: "Enter Top Speed",
+          },
+        ])
+        .then((answers) => {
+          const car = new Car(
+            // TODO: The generateVin method is static and should be called using the class name Cli, make sure to use Cli.generateVin() for creating a truck and motorbike as well!
+            Cli.generateVin(),
+            answers.color,
+            answers.make,
+            answers.model,
+            parseInt(answers.year),
+            parseInt(answers.weight),
+            parseInt(answers.topSpeed),
+            []
+          );
+          // push the car to the vehicles array
+          this.vehicles.push(car);
+          // set the selectedVehicleVin to the vin of the car
+          this.selectedVehicleVin = car.vin;
+          // perform actions on the car
+          this.performActions();
+        });
+    }
+
   // method to create a truck
-  createTruck(): void {
+  addDepartment(): void {
     inquirer
       .prompt([
         {
           type: "input",
-          name: "color",
-          message: "Enter Color",
+          name: "name",
+          message: "What is the name of the department?",
         },
+        // That's it.
         {
           type: "input",
           name: "make",
@@ -197,14 +257,25 @@ class Cli {
   }
 
   // method to create a motorbike
-  createMotorbike(): void {
+  addRole(): void {
     inquirer
       .prompt([
         {
           type: "input",
-          name: "color",
-          message: "Enter Color",
+          name: "name",
+          message: "What is the name of the role?",
         },
+        {
+          type: "input",
+          name: "salary",
+          message: "What is the salary of the role?",
+        },
+        {
+          type: "input",
+          name: "department",
+          message: "What department does the role belong to?",
+        },
+        // That's it.
         {
           type: "input",
           name: "make",
@@ -321,17 +392,18 @@ class Cli {
         {
           type: "list",
           name: "action",
-          message: "Select an action",
+          message: "What would you like to do?",
           // TODO: add options to tow and wheelie
           choices: [
-            "Print details",
-            "Start vehicle",
-            "Accelerate 5 MPH",
-            "Decelerate 5 MPH",
-            "Stop vehicle",
-            "Turn right",
-            "Turn left",
-            "Reverse",
+            "View All Employees",
+            "Add Employee",
+            "Update Employee Role",
+            "View All Roles",
+            "Add Role",
+            "View All Departments",
+            "Add Department",
+            "Quit",
+
             "Tow",
             "Wheelie",
             "Select or create another vehicle",

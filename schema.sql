@@ -13,8 +13,8 @@ CREATE TABLE department (
 CREATE TABLE role (
     id SERIAL NOT NULL PRIMARY KEY,
     title VARCHAR(30) UNIQUE NOT NULL,
-    salary DECIMAL NOT NULL,
     department INTEGER NOT NULL,
+    salary DECIMAL NOT NULL,
     FOREIGN KEY (department)
     REFERENCES department(id)
 );
