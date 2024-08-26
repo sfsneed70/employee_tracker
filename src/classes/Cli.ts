@@ -17,9 +17,9 @@ class Cli {
 
   async getAllEmployees(): Promise<Employee[]> {
     const client = new pg.Client(clientConfig);
-    let employees: Employee[] = [];
-
     await client.connect();
+
+    let employees: Employee[] = [];
 
     const employee =
       await client.query(`SELECT emp.id, emp.first_name, emp.last_name,
@@ -30,9 +30,7 @@ class Cli {
   manager  FROM employee emp
   INNER JOIN role ON emp.role_id = role.id
   INNER JOIN department ON role.department = department.id
-  LEFT JOIN employee mgr ON emp.manager_id = mgr.id`);
-
-    await client.end();
+  LEFT JOIN employee mgr ON emp.manager_id = mgr.id ORDER BY emp.id ASC`);
 
     for (let i = 0; i < employee.rows.length; i++) {
       if (employee.rows[i].manager === " ") {
@@ -50,22 +48,22 @@ class Cli {
         )
       );
     }
+
+    await client.end();
+
     return employees;
   }
 
   async getAllRoles(): Promise<Role[]> {
     const client = new pg.Client(clientConfig);
+    await client.connect();
 
     let roles: Role[] = [];
-
-    await client.connect();
 
     const role = await client.query(`SELECT role.id, role.title,
    dept.name AS department,
    role.salary FROM role
-   INNER JOIN department dept ON role.department = dept.id`);
-
-    await client.end();
+   INNER JOIN department dept ON role.department = dept.id order by role.id ASC`);
 
     for (let i = 0; i < role.rows.length; i++) {
       roles.push(
@@ -77,30 +75,43 @@ class Cli {
         )
       );
     }
+
+    await client.end();
+
     return roles;
   }
 
   async getAllDepartments(): Promise<Department[]> {
     const client = new pg.Client(clientConfig);
+    await client.connect();
 
     let departments: Department[] = [];
 
-    await client.connect();
-
-    const department = await client.query(`SELECT * FROM department`);
-
-    await client.end();
+    const department = await client.query(`SELECT * FROM department order by id ASC`);
 
     for (let i = 0; i < department.rows.length; i++) {
       departments.push(
         new Department(department.rows[i].id, department.rows[i].name)
       );
     }
+
+    await client.end();
+
     return departments;
   }
 
   // method to create an employee
-  addEmployee(): void {
+  async addEmployee() {
+    const client = new pg.Client(clientConfig);
+    client.connect();
+
+    const roles = await client.query(`SELECT title AS name FROM role`);
+    const employees = await client.query(
+      `select CONCAT(first_name, ' ', last_name) AS name from employee`
+    );
+
+    employees.rows.unshift({ name: "None" });
+
     inquirer
       .prompt([
         {
@@ -114,39 +125,85 @@ class Cli {
           message: "What is the employee's last name?",
         },
         {
-          type: "input",
+          type: "list",
           name: "role",
           message: "What is the employee's role?",
+          choices: roles.rows,
         },
         {
-          type: "input",
+          type: "list",
           name: "manager",
           message: "Who is the employee's manager?",
+          choices: employees.rows,
         },
       ])
-      .then((answers) => {});
+      .then(async (answers) => {
+        let manager_id;
+        const role = await client.query(
+          `select id from role where title = '${answers.role}'`
+        );
+        if (answers.manager === 'None') {
+          manager_id = null;
+        } else {
+          const manager = await client.query(
+            `select id from employee where CONCAT(first_name, ' ', last_name) = '${answers.manager}'`
+          );
+          manager_id = manager.rows[0].id;
+        }
+        await client.query(
+          `INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES ('${answers.first_name}', '${answers.last_name}', ${role.rows[0].id}, ${manager_id})`
+        );
+        await client.end();
+      })
+      .then(async () => this.performActions());
   }
 
   // method to update an employee's role
-  updateEmployeeRole(): void {
+  async updateEmployeeRole() {
+    const client = new pg.Client(clientConfig);
+    client.connect();
+
+    const roles = await client.query(`SELECT title AS name FROM role`);
+    console.log(roles.rows);
+    const employees = await client.query(
+      `select CONCAT(first_name, ' ', last_name) AS name from employee`
+    );
+  
     inquirer
       .prompt([
         {
-          type: "input",
+          type: "list",
           name: "name",
           message: "Which employee's role do you want to update?",
+          choices: employees.rows,
         },
         {
-          type: "input",
+          type: "list",
           name: "role",
           message: "Which role do you want to assign to the selected employee?",
+          choices: roles.rows,
         },
       ])
-      .then((answers) => {});
+      .then(async (answers) => {
+        const role = await client.query(
+          `select id from role where title = '${answers.role}'`
+        );
+        const employee = await client.query(
+          `select id from employee where CONCAT(first_name, ' ', last_name) = '${answers.name}'`
+        );
+        await client.query(
+          `UPDATE employee SET role_id = ${role.rows[0].id} WHERE id = ${employee.rows[0].id}`
+        );
+        await client.end();
+      })
+      .then(() => this.performActions());
   }
 
   // method to create a department
   async addDepartment() {
+    const client = new pg.Client(clientConfig);
+    await client.connect();
+
     inquirer
       .prompt([
         {
@@ -156,14 +213,9 @@ class Cli {
         },
       ])
       .then(async (answers) => {
-        const client = new pg.Client(clientConfig);
-
-        await client.connect();
-
-        const department = await client.query(
+        await client.query(
           `INSERT INTO department (name) VALUES ('${answers.name}')`
         );
-
         await client.end();
       })
       .then(() => this.performActions());
@@ -171,6 +223,10 @@ class Cli {
 
   // method to create a role
   async addRole() {
+    const client = new pg.Client(clientConfig);
+    await client.connect();
+
+    const departments = await client.query(`SELECT name FROM department`);
     inquirer
       .prompt([
         {
@@ -184,17 +240,20 @@ class Cli {
           message: "What is the salary of the role?",
         },
         {
-          type: "input",
+          type: "list",
           name: "department",
           message: "What department does the role belong to?",
+          choices: departments.rows,
         },
       ])
       .then(async (answers) => {
-        const client = new pg.Client(clientConfig);
-        await client.connect();
-        const role = await client.query(
-          `INSERT INTO role (title, salary, department) VALUES ('${answers.name}', '${answers.salary}', '${answers.department}')`
+        const department = await client.query(
+          `SELECT id FROM department WHERE name = '${answers.department}'`
         );
+        await client.query(
+          `INSERT INTO role (title, salary, department) VALUES ('${answers.name}', '${answers.salary}', ${department.rows[0].id})`
+        );
+        await client.end();
       })
       .then(() => this.performActions());
   }
@@ -230,8 +289,11 @@ class Cli {
             .then(() => this.performActions());
         } else if (answers.action === "Add Employee") {
           // add employee
+          this.addEmployee();
         } else if (answers.action === "Update Employee Role") {
           // update employee role
+          this.updateEmployeeRole();
+
         } else if (answers.action === "View All Roles") {
           // display all roles
           this.getAllRoles()
