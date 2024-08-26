@@ -88,25 +88,6 @@ class Cli {
       .then(() => this.performActions());
   }
 
-  // async getAllDepartments(): Promise<Department[]> {
-  //   const client = new pg.Client(clientConfig);
-  //   await client.connect();
-
-  //   let departments: Department[] = [];
-
-  //   const department = await client.query(`SELECT * FROM department order by id ASC`);
-
-  //   for (let i = 0; i < department.rows.length; i++) {
-  //     departments.push(
-  //       new Department(department.rows[i].id, department.rows[i].name)
-  //     );
-  //   }
-
-  //   await client.end();
-
-  //   return departments;
-  // }
-
   async getAllDepartments() {
     const client = new pg.Client(clientConfig);
     await client.connect();
