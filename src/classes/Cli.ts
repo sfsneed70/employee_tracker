@@ -35,8 +35,8 @@ class Cli {
         let employees: Employee[] = [];
 
         for (let i = 0; i < employee.rows.length; i++) {
-          if (employee.rows[i].manager === ' ') {
-            employee.rows[i].manager = 'Null';
+          if (employee.rows[i].manager === " ") {
+            employee.rows[i].manager = "Null";
           }
           employees.push(
             new Employee(
@@ -110,17 +110,151 @@ class Cli {
     // return departments;
   }
 
+  async getAllEmployeesByManager() {
+    const client = new pg.Client(clientConfig);
+    await client.connect();
+
+    const managers = await client.query(
+      `select CONCAT(first_name, ' ', last_name) AS name from employee ORDER BY id ASC`
+    );
+
+    managers.rows.unshift({ name: "None" });
+
+    inquirer
+      .prompt([
+        {
+          type: "list",
+          name: "manager",
+          message: "Which manager's employees do you want to view?",
+          choices: managers.rows,
+        },
+      ])
+      .then(async (answers) => {
+        let query;
+
+        if (answers.manager === "None") {
+          query = `SELECT emp.id, emp.first_name, emp.last_name,
+          role.title AS title, 
+          department.name AS
+          department, role.salary as salary,
+          CONCAT(mgr.first_name, ' ', mgr.last_name) AS
+          manager  FROM employee emp
+          INNER JOIN role ON emp.role_id = role.id
+          INNER JOIN department ON role.department = department.id
+          LEFT JOIN employee mgr ON emp.manager_id = mgr.id WHERE emp.manager_id IS NULL ORDER BY emp.id ASC`;
+        } else {
+          const manager = await client.query(
+            `select id from employee where CONCAT(first_name, ' ', last_name) = '${answers.manager}'`
+          );
+          query = `SELECT emp.id, emp.first_name, emp.last_name,
+          role.title AS title, 
+          department.name AS
+          department, role.salary as salary,
+          CONCAT(mgr.first_name, ' ', mgr.last_name) AS
+          manager  FROM employee emp
+          INNER JOIN role ON emp.role_id = role.id
+          INNER JOIN department ON role.department = department.id
+          LEFT JOIN employee mgr ON emp.manager_id = mgr.id WHERE emp.manager_id = ${manager.rows[0].id} ORDER BY emp.id ASC`;
+        }
+
+        const employee = await client.query(query);
+
+        let employees: Employee[] = [];
+
+        for (let i = 0; i < employee.rows.length; i++) {
+          if (employee.rows[i].manager === " ") {
+            employee.rows[i].manager = "Null";
+          }
+          employees.push(
+            new Employee(
+              employee.rows[i].id,
+              employee.rows[i].first_name,
+              employee.rows[i].last_name,
+              employee.rows[i].title,
+              employee.rows[i].department,
+              employee.rows[i].salary,
+              employee.rows[i].manager
+            )
+          );
+        }
+        await client.end();
+        console.table(employees);
+      })
+      .then(async () => this.performActions());
+  }
+
+  async getAllEmployeesByDepartment() {
+    const client = new pg.Client(clientConfig);
+    await client.connect();
+
+    const departments = await client.query(
+      `SELECT name FROM department ORDER BY id ASC`
+    );
+    inquirer
+      .prompt([
+        {
+          type: "list",
+          name: "department",
+          message: "Which department's employees do you want to view?",
+          choices: departments.rows,
+        },
+      ])
+      .then(async (answers) => {
+        const department = await client.query(
+          `SELECT id FROM department WHERE name = '${answers.department}'`
+        );
+        const employee = await client
+          .query(
+            `SELECT emp.id, emp.first_name, emp.last_name,
+  role.title AS title, 
+  department.name AS
+  department, role.salary as salary,
+  CONCAT(mgr.first_name, ' ', mgr.last_name) AS
+  manager  FROM employee emp
+  INNER JOIN role ON emp.role_id = role.id
+  INNER JOIN department ON role.department = department.id
+  LEFT JOIN employee mgr ON emp.manager_id = mgr.id WHERE department.id = ${department.rows[0].id} ORDER BY emp.id ASC`
+          )
+          .then(async (employee) => {
+            let employees: Employee[] = [];
+
+            for (let i = 0; i < employee.rows.length; i++) {
+              if (employee.rows[i].manager === " ") {
+                employee.rows[i].manager = "Null";
+              }
+              employees.push(
+                new Employee(
+                  employee.rows[i].id,
+                  employee.rows[i].first_name,
+                  employee.rows[i].last_name,
+                  employee.rows[i].title,
+                  employee.rows[i].department,
+                  employee.rows[i].salary,
+                  employee.rows[i].manager
+                )
+              );
+            }
+
+            await client.end();
+            console.table(employees);
+          })
+          .then(() => this.performActions());
+      });
+  }
+
   // method to create an employee
   async addEmployee() {
     const client = new pg.Client(clientConfig);
     client.connect();
 
-    const roles = await client.query(`SELECT title AS name FROM role`);
-    const employees = await client.query(
-      `select CONCAT(first_name, ' ', last_name) AS name from employee`
+    const roles = await client.query(
+      `SELECT title AS name FROM role ORDER BY id ASC`
+    );
+    const managers = await client.query(
+      `select CONCAT(first_name, ' ', last_name) AS name from employee ORDER BY id ASC`
     );
 
-    employees.rows.unshift({ name: "None" });
+    managers.rows.unshift({ name: "None" });
 
     inquirer
       .prompt([
@@ -144,7 +278,7 @@ class Cli {
           type: "list",
           name: "manager",
           message: "Who is the employee's manager?",
-          choices: employees.rows,
+          choices: managers.rows,
         },
       ])
       .then(async (answers) => {
@@ -173,10 +307,12 @@ class Cli {
     const client = new pg.Client(clientConfig);
     client.connect();
 
-    const roles = await client.query(`SELECT title AS name FROM role`);
+    const roles = await client.query(
+      `SELECT title AS name FROM role ORDER BY id ASC`
+    );
     console.log(roles.rows);
     const employees = await client.query(
-      `select CONCAT(first_name, ' ', last_name) AS name from employee`
+      `select CONCAT(first_name, ' ', last_name) AS name from employee ORDER BY id ASC`
     );
 
     inquirer
@@ -203,6 +339,54 @@ class Cli {
         );
         await client.query(
           `UPDATE employee SET role_id = ${role.rows[0].id} WHERE id = ${employee.rows[0].id}`
+        );
+        await client.end();
+      })
+      .then(() => this.performActions());
+  }
+
+  // method to update an employee's role
+  async updateEmployeeManager() {
+    const client = new pg.Client(clientConfig);
+    client.connect();
+
+    const employees = await client.query(
+      `select CONCAT(first_name, ' ', last_name) AS name from employee ORDER BY id ASC`
+    );
+    const managers = await client.query(
+      `select CONCAT(first_name, ' ', last_name) AS name from employee ORDER BY id ASC`
+    );
+    managers.rows.unshift({ name: "None" });
+
+    inquirer
+      .prompt([
+        {
+          type: "list",
+          name: "name",
+          message: "Which employee's role do you want to update?",
+          choices: employees.rows,
+        },
+        {
+          type: "list",
+          name: "manager",
+          message:
+            "Which manager do you want to assign to the selected employee?",
+          choices: managers.rows,
+        },
+      ])
+      .then(async (answers) => {
+        let manager_id;
+
+        if (answers.manager === "None") {
+          manager_id = null;
+        } else {
+          const manager = await client.query(
+            `select id from employee where CONCAT(first_name, ' ', last_name) = '${answers.manager}'`
+          );
+          manager_id = manager.rows[0].id;
+        }
+        await client.query(
+          `UPDATE employee SET manager_id = ${manager_id} WHERE CONCAT(first_name, ' ', last_name) = '${answers.name}'`
         );
         await client.end();
       })
@@ -236,7 +420,9 @@ class Cli {
     const client = new pg.Client(clientConfig);
     await client.connect();
 
-    const departments = await client.query(`SELECT name FROM department`);
+    const departments = await client.query(
+      `SELECT name FROM department ORDER BY id ASC`
+    );
     inquirer
       .prompt([
         {
@@ -278,8 +464,11 @@ class Cli {
           message: "What would you like to do?",
           choices: [
             "View All Employees",
+            "View All Employees By Manager",
+            "View All Employees By Department",
             "Add Employee",
             "Update Employee Role",
+            "Update Employee Manager",
             "View All Roles",
             "Add Role",
             "View All Departments",
@@ -293,12 +482,21 @@ class Cli {
         if (answers.action === "View All Employees") {
           // display all employees
           this.getAllEmployees();
+        } else if (answers.action === "View All Employees By Manager") {
+          // display all employees by manager
+          this.getAllEmployeesByManager();
+        } else if (answers.action === "View All Employees By Department") {
+          // display all employees by department
+          this.getAllEmployeesByDepartment();
         } else if (answers.action === "Add Employee") {
           // add employee
           this.addEmployee();
         } else if (answers.action === "Update Employee Role") {
           // update employee role
           this.updateEmployeeRole();
+        } else if (answers.action === "Update Employee Manager") {
+          // update employee manager
+          this.updateEmployeeManager();
         } else if (answers.action === "View All Roles") {
           // display all roles
           this.getAllRoles();
