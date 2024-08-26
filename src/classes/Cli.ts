@@ -15,14 +15,13 @@ const clientConfig = {
 class Cli {
   // quit: boolean = false;
 
-  async getAllEmployees(): Promise<Employee[]> {
+  async getAllEmployees() {
     const client = new pg.Client(clientConfig);
     await client.connect();
 
-    let employees: Employee[] = [];
-
-    const employee =
-      await client.query(`SELECT emp.id, emp.first_name, emp.last_name,
+    const employee = await client
+      .query(
+        `SELECT emp.id, emp.first_name, emp.last_name,
   role.title AS title, 
   department.name AS
   department, role.salary as salary,
@@ -30,74 +29,104 @@ class Cli {
   manager  FROM employee emp
   INNER JOIN role ON emp.role_id = role.id
   INNER JOIN department ON role.department = department.id
-  LEFT JOIN employee mgr ON emp.manager_id = mgr.id ORDER BY emp.id ASC`);
+  LEFT JOIN employee mgr ON emp.manager_id = mgr.id ORDER BY emp.id ASC`
+      )
+      .then(async (employee) => {
+        let employees: Employee[] = [];
 
-    for (let i = 0; i < employee.rows.length; i++) {
-      if (employee.rows[i].manager === " ") {
-        employee.rows[i].manager = "None";
-      }
-      employees.push(
-        new Employee(
-          employee.rows[i].id,
-          employee.rows[i].first_name,
-          employee.rows[i].last_name,
-          employee.rows[i].title,
-          employee.rows[i].department,
-          employee.rows[i].salary,
-          employee.rows[i].manager
-        )
-      );
-    }
+        for (let i = 0; i < employee.rows.length; i++) {
+          if (employee.rows[i].manager === ' ') {
+            employee.rows[i].manager = 'Null';
+          }
+          employees.push(
+            new Employee(
+              employee.rows[i].id,
+              employee.rows[i].first_name,
+              employee.rows[i].last_name,
+              employee.rows[i].title,
+              employee.rows[i].department,
+              employee.rows[i].salary,
+              employee.rows[i].manager
+            )
+          );
+        }
 
-    await client.end();
-
-    return employees;
+        await client.end();
+        console.table(employees);
+      })
+      .then(() => this.performActions());
   }
 
-  async getAllRoles(): Promise<Role[]> {
+  async getAllRoles() {
     const client = new pg.Client(clientConfig);
     await client.connect();
 
-    let roles: Role[] = [];
-
-    const role = await client.query(`SELECT role.id, role.title,
+    const role = await client
+      .query(
+        `SELECT role.id, role.title,
    dept.name AS department,
    role.salary FROM role
-   INNER JOIN department dept ON role.department = dept.id order by role.id ASC`);
+   INNER JOIN department dept ON role.department = dept.id order by role.id ASC`
+      )
+      .then(async (role) => {
+        let roles: Role[] = [];
 
-    for (let i = 0; i < role.rows.length; i++) {
-      roles.push(
-        new Role(
-          role.rows[i].id,
-          role.rows[i].title,
-          role.rows[i].department,
-          role.rows[i].salary
-        )
-      );
-    }
+        for (let i = 0; i < role.rows.length; i++) {
+          roles.push(
+            new Role(
+              role.rows[i].id,
+              role.rows[i].title,
+              role.rows[i].department,
+              role.rows[i].salary
+            )
+          );
+        }
 
-    await client.end();
-
-    return roles;
+        await client.end();
+        console.table(roles);
+      })
+      .then(() => this.performActions());
   }
 
-  async getAllDepartments(): Promise<Department[]> {
+  // async getAllDepartments(): Promise<Department[]> {
+  //   const client = new pg.Client(clientConfig);
+  //   await client.connect();
+
+  //   let departments: Department[] = [];
+
+  //   const department = await client.query(`SELECT * FROM department order by id ASC`);
+
+  //   for (let i = 0; i < department.rows.length; i++) {
+  //     departments.push(
+  //       new Department(department.rows[i].id, department.rows[i].name)
+  //     );
+  //   }
+
+  //   await client.end();
+
+  //   return departments;
+  // }
+
+  async getAllDepartments() {
     const client = new pg.Client(clientConfig);
     await client.connect();
 
-    let departments: Department[] = [];
+    const department = await client
+      .query(`SELECT * FROM department order by id ASC`)
+      .then(async (department) => {
+        let departments: Department[] = [];
 
-    const department = await client.query(`SELECT * FROM department order by id ASC`);
+        for (let i = 0; i < department.rows.length; i++) {
+          departments.push(
+            new Department(department.rows[i].id, department.rows[i].name)
+          );
+        }
 
-    for (let i = 0; i < department.rows.length; i++) {
-      departments.push(
-        new Department(department.rows[i].id, department.rows[i].name)
-      );
-    }
-
-    await client.end();
-
-    return departments;
+        await client.end();
+        console.table(departments);
+      })
+      .then(() => this.performActions());
+    // return departments;
   }
 
   // method to create an employee
@@ -142,7 +171,7 @@ class Cli {
         const role = await client.query(
           `select id from role where title = '${answers.role}'`
         );
-        if (answers.manager === 'None') {
+        if (answers.manager === "None") {
           manager_id = null;
         } else {
           const manager = await client.query(
@@ -168,7 +197,7 @@ class Cli {
     const employees = await client.query(
       `select CONCAT(first_name, ' ', last_name) AS name from employee`
     );
-  
+
     inquirer
       .prompt([
         {
@@ -282,46 +311,28 @@ class Cli {
         // perform the selected action
         if (answers.action === "View All Employees") {
           // display all employees
-          this.getAllEmployees()
-            .then((employees: Employee[]) => {
-              console.table(employees);
-            })
-            .then(() => this.performActions());
+          this.getAllEmployees();
         } else if (answers.action === "Add Employee") {
           // add employee
           this.addEmployee();
         } else if (answers.action === "Update Employee Role") {
           // update employee role
           this.updateEmployeeRole();
-
         } else if (answers.action === "View All Roles") {
           // display all roles
-          this.getAllRoles()
-            .then((roles: Role[]) => {
-              console.table(roles);
-            })
-            .then(() => this.performActions());
+          this.getAllRoles();
         } else if (answers.action === "Add Role") {
           // add role
           this.addRole();
         } else if (answers.action === "View All Departments") {
-          // display all departments
-          this.getAllDepartments()
-            .then((departments: Department[]) => {
-              console.table(departments);
-            })
-            .then(() => this.performActions());
+          this.getAllDepartments();
         } else if (answers.action === "Add Department") {
           // add department
           this.addDepartment();
         } else if (answers.action === "Quit") {
           // exit the cli if the user selects quit
-          // this.quit = true;
           return;
         }
-        // if (!this.quit) {
-        //   // this.performActions();
-        // }
       });
   }
 }
