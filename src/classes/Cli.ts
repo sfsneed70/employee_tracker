@@ -5,6 +5,15 @@ import Truck from "./Truck.js";
 import Car from "./Car.js";
 import Motorbike from "./Motorbike.js";
 import Wheel from "./Wheel.js";
+import Employee from "./Employee.js";
+import Role from "./Role.js";
+import Department from "./Department.js";
+
+const clientConfig = {
+  user: "postgres",
+  host: "localhost",
+  database: "employee_db",
+};
 
 // define the Cli class
 class Cli {
@@ -15,7 +24,7 @@ class Cli {
   selectedVehicleVin: string | undefined;
   exit: boolean = false;
 
-  // TODO: Update the constructor to accept Truck and Motorbike objects as well
+  //  TODO: Update the constructor to accept Truck and Motorbike objects as well
   constructor(vehicles: (Car | Truck | Motorbike)[]) {
     this.vehicles = vehicles;
   }
@@ -27,6 +36,96 @@ class Cli {
       Math.random().toString(36).substring(2, 15) +
       Math.random().toString(36).substring(2, 15)
     );
+  }
+
+  async getAllEmployees(): Promise<Employee[]> {
+    const client = new pg.Client(clientConfig);
+    let employees: Employee[] = [];
+
+    await client.connect();
+
+    const employee =
+      await client.query(`SELECT emp.id, emp.first_name, emp.last_name,
+  role.title AS title, 
+  department.name AS
+  department, role.salary as salary,
+  CONCAT(mgr.first_name, ' ', mgr.last_name) AS
+  manager  FROM employee emp
+  INNER JOIN role ON emp.role_id = role.id
+  INNER JOIN department ON role.department = department.id
+  LEFT JOIN employee mgr ON emp.manager_id = mgr.id`);
+
+    await client.end();
+
+    for (let i = 0; i < employee.rows.length; i++) {
+      if (employee.rows[i].manager === " ") {
+        employee.rows[i].manager = "None";
+      }
+      employees.push(
+        new Employee(
+          employee.rows[i].id,
+          employee.rows[i].first_name,
+          employee.rows[i].last_name,
+          employee.rows[i].title,
+          employee.rows[i].department,
+          employee.rows[i].salary,
+          employee.rows[i].manager
+        )
+      );
+    }
+    return employees;
+    // this.performActions();
+  }
+
+  async getAllRoles(): Promise<Role[]> {
+    const client = new pg.Client(clientConfig);
+
+    let roles: Role[] = [];
+
+    await client.connect();
+
+    const role = await client.query(`SELECT role.id, role.title,
+   dept.name AS department,
+   role.salary FROM role
+   INNER JOIN department dept ON role.department = dept.id`);
+
+    await client.end();
+
+    for (let i = 0; i < role.rows.length; i++) {
+      roles.push(
+        new Role(
+          role.rows[i].id,
+          role.rows[i].title,
+          role.rows[i].department,
+          role.rows[i].salary
+        )
+      );
+    }
+    return roles;
+    // this.performActions();
+  }
+
+  async getAllDepartments(): Promise<Department[]> {
+    const client = new pg.Client(clientConfig);
+
+    let departments: Department[] = [];
+
+    await client.connect();
+
+    const department = await client.query('SELECT * FROM department');
+
+    await client.end();
+
+    for (let i = 0; i < department.rows.length; i++) {
+      departments.push(
+        new Department(
+          department.rows[i].id,
+          department.rows[i].name
+        )
+      );
+    }
+    return departments;
+    // this.performActions();
   }
 
   // method to choose a vehicle from existing vehicles
@@ -136,62 +235,62 @@ class Cli {
       });
   }
 
-    // method to create a car
-    updateEmployeeRole(): void {
-      inquirer
-        .prompt([
-          {
-            type: "input",
-            name: "name",
-            message: "Which employee's role do you want to update?",
-          },
-          {
-            type: "input",
-            name: "role",
-            message: "Which role do you want to assign to the selected employee?",
-          },
-          // That's it.
-          {
-            type: "input",
-            name: "role",
-            message: "What is the employee's role?",
-          },
-          {
-            type: "input",
-            name: "manager",
-            message: "Who is the employee's manager?",
-          },
-          {
-            type: "input",
-            name: "weight",
-            message: "Enter Weight",
-          },
-          {
-            type: "input",
-            name: "topSpeed",
-            message: "Enter Top Speed",
-          },
-        ])
-        .then((answers) => {
-          const car = new Car(
-            // TODO: The generateVin method is static and should be called using the class name Cli, make sure to use Cli.generateVin() for creating a truck and motorbike as well!
-            Cli.generateVin(),
-            answers.color,
-            answers.make,
-            answers.model,
-            parseInt(answers.year),
-            parseInt(answers.weight),
-            parseInt(answers.topSpeed),
-            []
-          );
-          // push the car to the vehicles array
-          this.vehicles.push(car);
-          // set the selectedVehicleVin to the vin of the car
-          this.selectedVehicleVin = car.vin;
-          // perform actions on the car
-          this.performActions();
-        });
-    }
+  // method to create a car
+  updateEmployeeRole(): void {
+    inquirer
+      .prompt([
+        {
+          type: "input",
+          name: "name",
+          message: "Which employee's role do you want to update?",
+        },
+        {
+          type: "input",
+          name: "role",
+          message: "Which role do you want to assign to the selected employee?",
+        },
+        // That's it.
+        {
+          type: "input",
+          name: "role",
+          message: "What is the employee's role?",
+        },
+        {
+          type: "input",
+          name: "manager",
+          message: "Who is the employee's manager?",
+        },
+        {
+          type: "input",
+          name: "weight",
+          message: "Enter Weight",
+        },
+        {
+          type: "input",
+          name: "topSpeed",
+          message: "Enter Top Speed",
+        },
+      ])
+      .then((answers) => {
+        const car = new Car(
+          // TODO: The generateVin method is static and should be called using the class name Cli, make sure to use Cli.generateVin() for creating a truck and motorbike as well!
+          Cli.generateVin(),
+          answers.color,
+          answers.make,
+          answers.model,
+          parseInt(answers.year),
+          parseInt(answers.weight),
+          parseInt(answers.topSpeed),
+          []
+        );
+        // push the car to the vehicles array
+        this.vehicles.push(car);
+        // set the selectedVehicleVin to the vin of the car
+        this.selectedVehicleVin = car.vin;
+        // perform actions on the car
+        this.performActions();
+      });
+  }
 
   // method to create a truck
   addDepartment(): void {
@@ -403,23 +502,18 @@ class Cli {
             "View All Departments",
             "Add Department",
             "Quit",
-
-            "Tow",
-            "Wheelie",
-            "Select or create another vehicle",
-            "Exit",
           ],
         },
       ])
       .then((answers) => {
         // perform the selected action
-        if (answers.action === "Print details") {
-          // find the selected vehicle and print its details
-          for (let i = 0; i < this.vehicles.length; i++) {
-            if (this.vehicles[i].vin === this.selectedVehicleVin) {
-              this.vehicles[i].printDetails();
-            }
-          }
+        if (answers.action === "View All Employees") {
+          // display all employees
+          this.getAllEmployees()
+            .then((employees: Employee[]) => {
+              console.table(employees);
+            })
+            .then(() => this.performActions());
         } else if (answers.action === "Start vehicle") {
           // find the selected vehicle and start it
           for (let i = 0; i < this.vehicles.length; i++) {
@@ -434,13 +528,13 @@ class Cli {
               this.vehicles[i].accelerate(5);
             }
           }
-        } else if (answers.action === "Decelerate 5 MPH") {
-          // find the selected vehicle and decelerate it by 5 MPH
-          for (let i = 0; i < this.vehicles.length; i++) {
-            if (this.vehicles[i].vin === this.selectedVehicleVin) {
-              this.vehicles[i].decelerate(5);
-            }
-          }
+        } else if (answers.action === "View All Roles") {
+          // display all roles
+          this.getAllRoles()
+            .then((roles: Role[]) => {
+              console.table(roles);
+            })
+            .then(() => this.performActions());
         } else if (answers.action === "Stop vehicle") {
           // find the selected vehicle and stop it
           for (let i = 0; i < this.vehicles.length; i++) {
@@ -448,13 +542,13 @@ class Cli {
               this.vehicles[i].stop();
             }
           }
-        } else if (answers.action === "Turn right") {
-          // find the selected vehicle and turn it right
-          for (let i = 0; i < this.vehicles.length; i++) {
-            if (this.vehicles[i].vin === this.selectedVehicleVin) {
-              this.vehicles[i].turn("right");
-            }
-          }
+        } else if (answers.action === "View All Departments") {
+          // display all departments
+          this.getAllDepartments()
+            .then((departments: Department[]) => {
+              console.table(departments);
+            })
+            .then(() => this.performActions());
         } else if (answers.action === "Turn left") {
           // find the selected vehicle and turn it left
           for (let i = 0; i < this.vehicles.length; i++) {
@@ -497,42 +591,25 @@ class Cli {
               }
             }
           }
-        } else if (answers.action === "Select or create another vehicle") {
-          // start the cli to return to the initial prompt if the user wants to select or create another vehicle
-          this.startCli();
-          return;
-        } else {
+          // } else if (answers.action === "Select or create another vehicle") {
+          //   // start the cli to return to the initial prompt if the user wants to select or create another vehicle
+          //   this.startCli();
+          //   return;
+        } else if (answers.action === "Quit") {
           // exit the cli if the user selects exit
           this.exit = true;
         }
         if (!this.exit) {
           // if the user does not want to exit, perform actions on the selected vehicle
-          this.performActions();
+          // this.performActions();
         }
       });
   }
 
   // method to start the cli
-  startCli(): void {
-    inquirer
-      .prompt([
-        {
-          type: "list",
-          name: "CreateOrSelect",
-          message:
-            "Would you like to create a new vehicle or perform an action on an existing vehicle?",
-          choices: ["Create a new vehicle", "Select an existing vehicle"],
-        },
-      ])
-      .then((answers) => {
-        // check if the user wants to create a new vehicle or select an existing vehicle
-        if (answers.CreateOrSelect === "Create a new vehicle") {
-          this.createVehicle();
-        } else {
-          this.chooseVehicle();
-        }
-      });
-  }
+  // startCli(): void {
+  //   this.performActions();
+  // }
 }
 
 // export the Cli class
