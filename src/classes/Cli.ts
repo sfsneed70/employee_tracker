@@ -108,7 +108,6 @@ class Cli {
         },
       ])
       .then(async (answers) => {
-        let query;
         let employee;
         if (answers.manager === "None") {
           employee = await pool.query(`SELECT emp.id, emp.first_name, emp.last_name,
@@ -134,8 +133,6 @@ class Cli {
           INNER JOIN department ON role.department = department.id
           LEFT JOIN employee mgr ON emp.manager_id = mgr.id WHERE emp.manager_id = $1 ORDER BY emp.id ASC`, [manager.rows[0].id]);
         }
-
-        // const employee = await pool.query(query, [manager.rows[0].id]);
 
         let employees: Employee[] = [];
 
@@ -371,9 +368,6 @@ class Cli {
         },
       ])
       .then(async (answers) => {
-        // await pool.query(
-        //   `INSERT INTO department (name) VALUES ('${answers.name}')`
-        // );
         await pool.query(
           `INSERT INTO department (name) VALUES ($1)`, [answers.name]
         );
@@ -473,7 +467,6 @@ class Cli {
           this.addDepartment();
         } else if (answers.action === "Quit") {
           // exit the cli if the user selects quit
-          // return;
           process.exit(0);
         }
       });
