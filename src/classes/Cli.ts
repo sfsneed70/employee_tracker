@@ -4,22 +4,13 @@ import inquirer from "inquirer";
 import Employee from "./Employee.js";
 import Role from "./Role.js";
 import Department from "./Department.js";
-
-const clientConfig = {
-  user: "postgres",
-  host: "localhost",
-  database: "employee_db",
-};
+import { pool, connectToDb } from "../connections.js";
+import { printTable } from "console-table-printer";
 
 // define the Cli class
 class Cli {
-  // quit: boolean = false;
-
   async getAllEmployees() {
-    const client = new pg.Client(clientConfig);
-    await client.connect();
-
-    const employee = await client
+    const employee = await pool
       .query(
         `SELECT emp.id, emp.first_name, emp.last_name,
   role.title AS title, 
@@ -36,7 +27,7 @@ class Cli {
 
         for (let i = 0; i < employee.rows.length; i++) {
           if (employee.rows[i].manager === " ") {
-            employee.rows[i].manager = "Null";
+            employee.rows[i].manager = "null";
           }
           employees.push(
             new Employee(
@@ -51,17 +42,13 @@ class Cli {
           );
         }
 
-        await client.end();
-        console.table(employees);
+        printTable(employees);
       })
       .then(() => this.performActions());
   }
 
   async getAllRoles() {
-    const client = new pg.Client(clientConfig);
-    await client.connect();
-
-    const role = await client
+    const role = await pool
       .query(
         `SELECT role.id, role.title,
    dept.name AS department,
@@ -82,17 +69,13 @@ class Cli {
           );
         }
 
-        await client.end();
-        console.table(roles);
+        printTable(roles);
       })
       .then(() => this.performActions());
   }
 
   async getAllDepartments() {
-    const client = new pg.Client(clientConfig);
-    await client.connect();
-
-    const department = await client
+    const department = await pool
       .query(`SELECT * FROM department order by id ASC`)
       .then(async (department) => {
         let departments: Department[] = [];
@@ -103,18 +86,13 @@ class Cli {
           );
         }
 
-        await client.end();
-        console.table(departments);
+        printTable(departments);
       })
       .then(() => this.performActions());
-    // return departments;
   }
 
   async getAllEmployeesByManager() {
-    const client = new pg.Client(clientConfig);
-    await client.connect();
-
-    const managers = await client.query(
+    const managers = await pool.query(
       `select CONCAT(first_name, ' ', last_name) AS name from employee ORDER BY id ASC`
     );
 
@@ -131,9 +109,9 @@ class Cli {
       ])
       .then(async (answers) => {
         let query;
-
+        let employee;
         if (answers.manager === "None") {
-          query = `SELECT emp.id, emp.first_name, emp.last_name,
+          employee = await pool.query(`SELECT emp.id, emp.first_name, emp.last_name,
           role.title AS title, 
           department.name AS
           department, role.salary as salary,
@@ -141,12 +119,12 @@ class Cli {
           manager  FROM employee emp
           INNER JOIN role ON emp.role_id = role.id
           INNER JOIN department ON role.department = department.id
-          LEFT JOIN employee mgr ON emp.manager_id = mgr.id WHERE emp.manager_id IS NULL ORDER BY emp.id ASC`;
+          LEFT JOIN employee mgr ON emp.manager_id = mgr.id WHERE emp.manager_id IS NULL ORDER BY emp.id ASC`);
         } else {
-          const manager = await client.query(
-            `select id from employee where CONCAT(first_name, ' ', last_name) = '${answers.manager}'`
+          const manager = await pool.query(
+            `select id from employee where CONCAT(first_name, ' ', last_name) = $1`, [answers.manager]
           );
-          query = `SELECT emp.id, emp.first_name, emp.last_name,
+          employee = await pool.query(`SELECT emp.id, emp.first_name, emp.last_name,
           role.title AS title, 
           department.name AS
           department, role.salary as salary,
@@ -154,40 +132,40 @@ class Cli {
           manager  FROM employee emp
           INNER JOIN role ON emp.role_id = role.id
           INNER JOIN department ON role.department = department.id
-          LEFT JOIN employee mgr ON emp.manager_id = mgr.id WHERE emp.manager_id = ${manager.rows[0].id} ORDER BY emp.id ASC`;
+          LEFT JOIN employee mgr ON emp.manager_id = mgr.id WHERE emp.manager_id = $1 ORDER BY emp.id ASC`, [manager.rows[0].id]);
         }
 
-        const employee = await client.query(query);
+        // const employee = await pool.query(query, [manager.rows[0].id]);
 
         let employees: Employee[] = [];
 
-        for (let i = 0; i < employee.rows.length; i++) {
-          if (employee.rows[i].manager === " ") {
-            employee.rows[i].manager = "Null";
+        if (employee.rows.length === 0) {
+          console.log("No employees found for the selected manager.");
+        } else {
+          for (let i = 0; i < employee.rows.length; i++) {
+            if (employee.rows[i].manager === " ") {
+              employee.rows[i].manager = "Null";
+            }
+            employees.push(
+              new Employee(
+                employee.rows[i].id,
+                employee.rows[i].first_name,
+                employee.rows[i].last_name,
+                employee.rows[i].title,
+                employee.rows[i].department,
+                employee.rows[i].salary,
+                employee.rows[i].manager
+              )
+            );
           }
-          employees.push(
-            new Employee(
-              employee.rows[i].id,
-              employee.rows[i].first_name,
-              employee.rows[i].last_name,
-              employee.rows[i].title,
-              employee.rows[i].department,
-              employee.rows[i].salary,
-              employee.rows[i].manager
-            )
-          );
+          printTable(employees);
         }
-        await client.end();
-        console.table(employees);
       })
       .then(async () => this.performActions());
   }
 
   async getAllEmployeesByDepartment() {
-    const client = new pg.Client(clientConfig);
-    await client.connect();
-
-    const departments = await client.query(
+    const departments = await pool.query(
       `SELECT name FROM department ORDER BY id ASC`
     );
     inquirer
@@ -200,10 +178,10 @@ class Cli {
         },
       ])
       .then(async (answers) => {
-        const department = await client.query(
-          `SELECT id FROM department WHERE name = '${answers.department}'`
+        const department = await pool.query(
+          `SELECT id FROM department WHERE name = $1`, [answers.department]
         );
-        const employee = await client
+        const employee = await pool
           .query(
             `SELECT emp.id, emp.first_name, emp.last_name,
   role.title AS title, 
@@ -213,7 +191,7 @@ class Cli {
   manager  FROM employee emp
   INNER JOIN role ON emp.role_id = role.id
   INNER JOIN department ON role.department = department.id
-  LEFT JOIN employee mgr ON emp.manager_id = mgr.id WHERE department.id = ${department.rows[0].id} ORDER BY emp.id ASC`
+  LEFT JOIN employee mgr ON emp.manager_id = mgr.id WHERE department.id = $1 ORDER BY emp.id ASC`, [department.rows[0].id]
           )
           .then(async (employee) => {
             let employees: Employee[] = [];
@@ -235,8 +213,7 @@ class Cli {
               );
             }
 
-            await client.end();
-            console.table(employees);
+            printTable(employees);
           })
           .then(() => this.performActions());
       });
@@ -244,13 +221,10 @@ class Cli {
 
   // method to create an employee
   async addEmployee() {
-    const client = new pg.Client(clientConfig);
-    client.connect();
-
-    const roles = await client.query(
+    const roles = await pool.query(
       `SELECT title AS name FROM role ORDER BY id ASC`
     );
-    const managers = await client.query(
+    const managers = await pool.query(
       `select CONCAT(first_name, ' ', last_name) AS name from employee ORDER BY id ASC`
     );
 
@@ -283,35 +257,32 @@ class Cli {
       ])
       .then(async (answers) => {
         let manager_id;
-        const role = await client.query(
+        const role = await pool.query(
           `select id from role where title = '${answers.role}'`
         );
         if (answers.manager === "None") {
           manager_id = null;
         } else {
-          const manager = await client.query(
-            `select id from employee where CONCAT(first_name, ' ', last_name) = '${answers.manager}'`
+          const manager = await pool.query(
+            `select id from employee where CONCAT(first_name, ' ', last_name) = $1`, [answers.manager]
           );
           manager_id = manager.rows[0].id;
         }
-        await client.query(
-          `INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES ('${answers.first_name}', '${answers.last_name}', ${role.rows[0].id}, ${manager_id})`
+        await pool.query(
+          `INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES ($1, $2, $3, $4)`,
+          [answers.first_name, answers.last_name, role.rows[0].id, manager_id]
         );
-        await client.end();
       })
       .then(async () => this.performActions());
   }
 
   // method to update an employee's role
   async updateEmployeeRole() {
-    const client = new pg.Client(clientConfig);
-    client.connect();
-
-    const roles = await client.query(
+    const roles = await pool.query(
       `SELECT title AS name FROM role ORDER BY id ASC`
     );
     console.log(roles.rows);
-    const employees = await client.query(
+    const employees = await pool.query(
       `select CONCAT(first_name, ' ', last_name) AS name from employee ORDER BY id ASC`
     );
 
@@ -331,29 +302,25 @@ class Cli {
         },
       ])
       .then(async (answers) => {
-        const role = await client.query(
+        const role = await pool.query(
           `select id from role where title = '${answers.role}'`
         );
-        const employee = await client.query(
-          `select id from employee where CONCAT(first_name, ' ', last_name) = '${answers.name}'`
+        const employee = await pool.query(
+          `select id from employee where CONCAT(first_name, ' ', last_name) = $1`, [answers.name]
         );
-        await client.query(
-          `UPDATE employee SET role_id = ${role.rows[0].id} WHERE id = ${employee.rows[0].id}`
+        await pool.query(
+          `UPDATE employee SET role_id = $1 WHERE id = $2`, [role.rows[0].id, employee.rows[0].id]
         );
-        await client.end();
       })
       .then(() => this.performActions());
   }
 
   // method to update an employee's role
   async updateEmployeeManager() {
-    const client = new pg.Client(clientConfig);
-    client.connect();
-
-    const employees = await client.query(
+    const employees = await pool.query(
       `select CONCAT(first_name, ' ', last_name) AS name from employee ORDER BY id ASC`
     );
-    const managers = await client.query(
+    const managers = await pool.query(
       `select CONCAT(first_name, ' ', last_name) AS name from employee ORDER BY id ASC`
     );
     managers.rows.unshift({ name: "None" });
@@ -380,24 +347,21 @@ class Cli {
         if (answers.manager === "None") {
           manager_id = null;
         } else {
-          const manager = await client.query(
-            `select id from employee where CONCAT(first_name, ' ', last_name) = '${answers.manager}'`
+          const manager = await pool.query(
+            `select id from employee where CONCAT(first_name, ' ', last_name) = $1`, [answers.manager]
           );
           manager_id = manager.rows[0].id;
         }
-        await client.query(
-          `UPDATE employee SET manager_id = ${manager_id} WHERE CONCAT(first_name, ' ', last_name) = '${answers.name}'`
+        console.log(manager_id, answers.name);
+        await pool.query(
+          `UPDATE employee SET manager_id = $1 WHERE CONCAT(first_name, ' ', last_name) = $2`, [manager_id, answers.name]
         );
-        await client.end();
       })
       .then(() => this.performActions());
   }
 
   // method to create a department
   async addDepartment() {
-    const client = new pg.Client(clientConfig);
-    await client.connect();
-
     inquirer
       .prompt([
         {
@@ -407,20 +371,19 @@ class Cli {
         },
       ])
       .then(async (answers) => {
-        await client.query(
-          `INSERT INTO department (name) VALUES ('${answers.name}')`
+        // await pool.query(
+        //   `INSERT INTO department (name) VALUES ('${answers.name}')`
+        // );
+        await pool.query(
+          `INSERT INTO department (name) VALUES ($1)`, [answers.name]
         );
-        await client.end();
       })
       .then(() => this.performActions());
   }
 
   // method to create a role
   async addRole() {
-    const client = new pg.Client(clientConfig);
-    await client.connect();
-
-    const departments = await client.query(
+    const departments = await pool.query(
       `SELECT name FROM department ORDER BY id ASC`
     );
     inquirer
@@ -443,19 +406,19 @@ class Cli {
         },
       ])
       .then(async (answers) => {
-        const department = await client.query(
-          `SELECT id FROM department WHERE name = '${answers.department}'`
+        const department = await pool.query(
+          `SELECT id FROM department WHERE name = $1`, [answers.department]
         );
-        await client.query(
-          `INSERT INTO role (title, salary, department) VALUES ('${answers.name}', '${answers.salary}', ${department.rows[0].id})`
+        await pool.query(
+          `INSERT INTO role (title, salary, department) VALUES ($1, $2, $3)`,
+          [answers.name, answers.salary, department.rows[0].id]
         );
-        await client.end();
       })
       .then(() => this.performActions());
   }
 
   // method to perform actions on employee_db
-  performActions(): void {
+  performActions() {
     inquirer
       .prompt([
         {
@@ -510,7 +473,8 @@ class Cli {
           this.addDepartment();
         } else if (answers.action === "Quit") {
           // exit the cli if the user selects quit
-          return;
+          // return;
+          process.exit(0);
         }
       });
   }
