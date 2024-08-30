@@ -278,7 +278,6 @@ class Cli {
     const roles = await pool.query(
       `SELECT title AS name FROM role ORDER BY id ASC`
     );
-    console.log(roles.rows);
     const employees = await pool.query(
       `select CONCAT(first_name, ' ', last_name) AS name from employee ORDER BY id ASC`
     );
