@@ -6,6 +6,8 @@
 
 A command-line application from scratch to manage a company's employee database, using Node.js, Inquirer, and PostgreSQL.
 
+Link to walkthrough video:  https://drive.google.com/file/d/1dNTteXygxlXNsW-nsVXnQT4b4PfkOtSg/view?usp=drive_linkLinks
+
 ## Table of Contents
 
 - [Installation](#installation)
